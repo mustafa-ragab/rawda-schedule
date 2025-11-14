@@ -1,0 +1,53 @@
+# Composer
+/vendor/
+composer.lock
+
+# Environment files
+.env
+.env.local
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+error_log
+php_error_log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Database files (if using SQLite)
+*.sqlite
+*.sqlite3
+*.db
+
+# Images and uploaded files (optional - remove if you want to track them)
+/images/*
+!/images/.gitkeep
+
+# Data files
+/data/*
+!/data/.gitkeep
+
+# Cache
+cache/
+tmp/
+
+# Node modules (if using npm)
+node_modules/
+
+# Build files
+build/
+dist/
+
