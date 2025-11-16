@@ -37,19 +37,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $newWeekNumber = $lastWeek ? $lastWeek['week_number'] + 1 : 1;
             
             // إضافة الجلسات للأسبوع (7 أيام)
-            // ترتيب الأيام من السبت إلى الجمعة
-            $days = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+            // ترتيب الأيام من الأحد إلى السبت (ثابت)
+            $days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
             $startDateObj = new DateTime($startDate);
             
-            // حساب يوم الأسبوع والبدء من السبت
-            $dayOfWeek = (int)$startDateObj->format('w'); // 0 = الأحد
-            $dayOfWeek = ($dayOfWeek == 0) ? 1 : ($dayOfWeek == 6 ? 0 : $dayOfWeek + 1);
-            $startDateObj->modify('-' . $dayOfWeek . ' days');
+            // حساب يوم الأسبوع والبدء من الأحد
+            $dayOfWeek = (int)$startDateObj->format('w'); // 0 = الأحد, 6 = السبت
+            // إذا كان اليوم ليس الأحد، نرجع للخلف حتى نصل للأحد
+            if ($dayOfWeek != 0) {
+                $startDateObj->modify('-' . $dayOfWeek . ' days');
+            }
             
-            // حفظ تاريخ السبت (بداية الأسبوع الفعلية) في قاعدة البيانات
+            // حفظ تاريخ الأحد (بداية الأسبوع الفعلية) في قاعدة البيانات
             $actualStartDate = $startDateObj->format('Y-m-d');
             
-            // إدراج الأسبوع باستخدام تاريخ السبت
+            // إدراج الأسبوع باستخدام تاريخ الأحد
             $insertWeek = "INSERT INTO weeks (office_id, week_number, start_date) VALUES (?, ?, ?)";
             $stmt = $conn->prepare($insertWeek);
             $stmt->bind_param("iis", $officeId, $newWeekNumber, $actualStartDate);
@@ -249,19 +251,44 @@ $conn->close();
         .back-link {
             display: inline-block;
             margin-bottom: 20px;
-            color: #1a4d7a;
+            margin-left: 10px;
+            padding: 12px 25px;
+            background: #e3f2fd;
+            color: #1976d2;
             text-decoration: none;
             font-weight: bold;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 2px solid #90caf9;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .back-link:hover {
-            text-decoration: underline;
+            background: #bbdefb;
+            color: #1565c0;
+            border-color: #64b5f6;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+            text-decoration: none;
+        }
+        .back-link.office-link {
+            background: #fff3e0;
+            color: #f57c00;
+            border-color: #ffb74d;
+        }
+        .back-link.office-link:hover {
+            background: #ffe0b2;
+            color: #e65100;
+            border-color: #ffa726;
         }
     </style>
 </head>
 <body>
     <div class="admin-container">
-        <a href="index.php" class="back-link">← العودة للجدول</a>
-        <a href="add_office.php" class="back-link" style="margin-right: 15px;">🏢 إدارة المكاتب</a>
+        <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="index.php" class="back-link">← العودة للجدول</a>
+            <a href="add_office.php" class="back-link office-link">🏢 إدارة المكاتب</a>
+        </div>
         
         <div class="form-card">
             <h1 style="text-align: center; color: #1a4d7a; margin-bottom: 30px;">إضافة أسبوع جديد</h1>
@@ -316,8 +343,8 @@ $conn->close();
                 <h2 style="color: #1a4d7a; margin-top: 30px; margin-bottom: 20px;">بيانات الأيام (7 أيام)</h2>
                 
                 <?php 
-                // ترتيب الأيام من السبت إلى الجمعة
-                $days = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+                // ترتيب الأيام من الأحد إلى السبت (ثابت)
+                $days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
                 for ($i = 0; $i < 7; $i++):
                 ?>
                     <div class="day-row">

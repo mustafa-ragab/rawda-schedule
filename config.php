@@ -27,6 +27,8 @@ function getDBConnection() {
     } else {
         // التحقق من أن الاتصال لا يزال نشطاً
         try {
+            // محاولة استخدام ping للتحقق من الاتصال
+            // إذا كان الاتصال مغلقاً، سيتم التقاط الخطأ
             if (!$conn->ping()) {
                 // إذا فشل ping، إنشاء اتصال جديد
                 $conn->close();
@@ -37,8 +39,11 @@ function getDBConnection() {
                 }
             }
         } catch (Exception $e) {
-            // إذا كان الاتصال مغلق، إنشاء اتصال جديد
+            // إذا كان الاتصال مغلق أو غير صالح، إنشاء اتصال جديد
             try {
+                if (is_object($conn)) {
+                    @$conn->close();
+                }
                 $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
                 $conn->set_charset("utf8mb4");
                 if ($conn->connect_error) {

@@ -4,6 +4,81 @@ require_once 'config.php';
 $message = '';
 $messageType = '';
 
+// معالجة حذف مكتب
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_office') {
+    $officeId = (int)$_POST['office_id'];
+    
+    if ($officeId > 0) {
+        $conn = getDBConnection();
+        
+        // بدء معاملة (transaction) لضمان حذف كل البيانات بشكل آمن
+        $conn->begin_transaction();
+        
+        try {
+            // 1. جلب جميع الأسابيع المرتبطة بالمكتب
+            $weeksQuery = "SELECT id FROM weeks WHERE office_id = ?";
+            $stmt = $conn->prepare($weeksQuery);
+            $stmt->bind_param("i", $officeId);
+            $stmt->execute();
+            $weeksResult = $stmt->get_result();
+            $weekIds = [];
+            while ($row = $weeksResult->fetch_assoc()) {
+                $weekIds[] = $row['id'];
+            }
+            $stmt->close();
+            
+            // 2. حذف جميع الجلسات المرتبطة بالأسابيع
+            if (!empty($weekIds)) {
+                $placeholders = implode(',', array_fill(0, count($weekIds), '?'));
+                $deleteSessionsQuery = "DELETE FROM sessions WHERE week_id IN ($placeholders)";
+                $stmt = $conn->prepare($deleteSessionsQuery);
+                $stmt->bind_param(str_repeat('i', count($weekIds)), ...$weekIds);
+                $stmt->execute();
+                $stmt->close();
+            }
+            
+            // 3. حذف جميع الأسابيع المرتبطة بالمكتب
+            $deleteWeeksQuery = "DELETE FROM weeks WHERE office_id = ?";
+            $stmt = $conn->prepare($deleteWeeksQuery);
+            $stmt->bind_param("i", $officeId);
+            $stmt->execute();
+            $deletedWeeks = $stmt->affected_rows;
+            $stmt->close();
+            
+            // 4. حذف المكتب نفسه
+            $deleteOfficeQuery = "DELETE FROM offices WHERE id = ?";
+            $stmt = $conn->prepare($deleteOfficeQuery);
+            $stmt->bind_param("i", $officeId);
+            $stmt->execute();
+            $deletedOffice = $stmt->affected_rows;
+            $stmt->close();
+            
+            // تأكيد المعاملة
+            $conn->commit();
+            
+            if ($deletedOffice > 0) {
+                $deletedInfo = '';
+                if ($deletedWeeks > 0) {
+                    $deletedInfo = " (تم حذف $deletedWeeks أسبوع مرتبط)";
+                }
+                $message = 'تم حذف المكتب بنجاح!' . $deletedInfo;
+                $messageType = 'success';
+            } else {
+                $message = 'لم يتم العثور على المكتب!';
+                $messageType = 'error';
+            }
+            
+        } catch (Exception $e) {
+            // في حالة حدوث خطأ، التراجع عن جميع التغييرات
+            $conn->rollback();
+            $message = 'حدث خطأ أثناء حذف المكتب: ' . $e->getMessage();
+            $messageType = 'error';
+        }
+        
+        // لا نغلق الاتصال هنا لأن getDBConnection() تديره تلقائياً
+    }
+}
+
 // معالجة إضافة مكتب جديد
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_office') {
     $officeName = trim($_POST['office_name']);
@@ -48,7 +123,7 @@ $conn = getDBConnection();
 $officesQuery = "SELECT * FROM offices ORDER BY name";
 $officesResult = $conn->query($officesQuery);
 $offices = $officesResult->fetch_all(MYSQLI_ASSOC);
-$conn->close();
+// لا نغلق الاتصال هنا لأن getDBConnection() تديره تلقائياً
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -230,42 +305,4 @@ $conn->close();
     </div>
 </body>
 </html>
-
-<?php
-// معالجة حذف مكتب
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_office') {
-    $officeId = (int)$_POST['office_id'];
-    
-    if ($officeId > 0) {
-        $conn = getDBConnection();
-        
-        // التحقق من وجود أسابيع مرتبطة بهذا المكتب
-        $checkWeeksQuery = "SELECT COUNT(*) as count FROM weeks WHERE office_id = ?";
-        $stmt = $conn->prepare($checkWeeksQuery);
-        $stmt->bind_param("i", $officeId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $weekCount = $result->fetch_assoc()['count'];
-        $stmt->close();
-        
-        if ($weekCount > 0) {
-            echo '<script>alert("لا يمكن حذف المكتب لأنه يحتوي على أسابيع مرتبطة به!"); window.location.href = "add_office.php";</script>';
-        } else {
-            $deleteQuery = "DELETE FROM offices WHERE id = ?";
-            $stmt = $conn->prepare($deleteQuery);
-            $stmt->bind_param("i", $officeId);
-            
-            if ($stmt->execute()) {
-                echo '<script>alert("تم حذف المكتب بنجاح!"); window.location.href = "add_office.php";</script>';
-            } else {
-                echo '<script>alert("حدث خطأ أثناء حذف المكتب!"); window.location.href = "add_office.php";</script>';
-            }
-            $stmt->close();
-        }
-        
-        $conn->close();
-        exit;
-    }
-}
-?>
 
