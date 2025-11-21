@@ -225,24 +225,99 @@ foreach ($offices as $office) {
             ];
         }
         
-        // ملء الجدول بالجلسات
+        // ملء الجدول بالجلسات والملفات - كود محسّن واحترافي
         foreach ($sessions as $session) {
-            $dateStr = $session['date'];
-            if (isset($scheduleGrid[$officeId][$dateStr])) {
-                $scheduleGrid[$officeId][$dateStr]['men'] = [
-                    'time' => $session['men_time'] ?? '',
-                    'trainer' => $session['men_trainer'] ?? '',
-                    'image' => $session['men_image'] ?? '',
-                    'enabled' => (bool)($session['men_enabled'] ?? true)
-                ];
-                
-                $scheduleGrid[$officeId][$dateStr]['women'] = [
-                    'time' => $session['women_time'] ?? '',
-                    'trainer' => $session['women_trainer'] ?? '',
-                    'image' => $session['women_image'] ?? '',
-                    'enabled' => (bool)($session['women_enabled'] ?? true)
-                ];
+            $dateStr = isset($session['date']) ? $session['date'] : null;
+            
+            // التحقق من صحة البيانات
+            if (empty($dateStr) || !isset($scheduleGrid[$officeId][$dateStr])) {
+                continue;
             }
+            
+            $sessionId = isset($session['id']) ? (int)$session['id'] : 0;
+            if ($sessionId <= 0) {
+                continue;
+            }
+            
+            // جلب جميع ملفات الرجال من جدول session_files لهذا التاريخ
+            $menFiles = [];
+            $menFilesQuery = "SELECT file_name, file_path, id FROM session_files WHERE session_id = ? AND file_type = 'men' ORDER BY id ASC";
+            $fileStmt = $conn->prepare($menFilesQuery);
+            if ($fileStmt) {
+                $fileStmt->bind_param("i", $sessionId);
+                if ($fileStmt->execute()) {
+                    $menFilesResult = $fileStmt->get_result();
+                    if ($menFilesResult) {
+                        while ($fileRow = $menFilesResult->fetch_assoc()) {
+                            if (!empty($fileRow['file_name']) && !empty($fileRow['file_path'])) {
+                                $menFiles[] = [
+                                    'filename' => trim($fileRow['file_name']),
+                                    'path' => trim($fileRow['file_path']),
+                                    'id' => isset($fileRow['id']) ? (int)$fileRow['id'] : 0
+                                ];
+                            }
+                        }
+                    }
+                }
+                $fileStmt->close();
+            }
+            
+            // جلب جميع ملفات النساء من جدول session_files لهذا التاريخ
+            $womenFiles = [];
+            $womenFilesQuery = "SELECT file_name, file_path, id FROM session_files WHERE session_id = ? AND file_type = 'women' ORDER BY id ASC";
+            $fileStmt = $conn->prepare($womenFilesQuery);
+            if ($fileStmt) {
+                $fileStmt->bind_param("i", $sessionId);
+                if ($fileStmt->execute()) {
+                    $womenFilesResult = $fileStmt->get_result();
+                    if ($womenFilesResult) {
+                        while ($fileRow = $womenFilesResult->fetch_assoc()) {
+                            if (!empty($fileRow['file_name']) && !empty($fileRow['file_path'])) {
+                                $womenFiles[] = [
+                                    'filename' => trim($fileRow['file_name']),
+                                    'path' => trim($fileRow['file_path']),
+                                    'id' => isset($fileRow['id']) ? (int)$fileRow['id'] : 0
+                                ];
+                            }
+                        }
+                    }
+                }
+                $fileStmt->close();
+            }
+            
+            // دعم البيانات القديمة - إذا لم توجد ملفات في الجدول الجديد، نستخدم الملف القديم
+            if (empty($menFiles) && !empty($session['men_image'])) {
+                $menImage = trim($session['men_image']);
+                if (!empty($menImage)) {
+                    $menFiles[] = [
+                        'filename' => $menImage,
+                        'path' => getImageUrl($menImage),
+                        'id' => 0
+                    ];
+                }
+            }
+            
+            if (empty($womenFiles) && !empty($session['women_image'])) {
+                $womenImage = trim($session['women_image']);
+                if (!empty($womenImage)) {
+                    $womenFiles[] = [
+                        'filename' => $womenImage,
+                        'path' => getImageUrl($womenImage),
+                        'id' => 0
+                    ];
+                }
+            }
+            
+            // حفظ الملفات في الجدول مع التحقق من البيانات
+            $scheduleGrid[$officeId][$dateStr]['men'] = [
+                'files' => $menFiles,
+                'enabled' => isset($session['men_enabled']) ? (bool)$session['men_enabled'] : true
+            ];
+            
+            $scheduleGrid[$officeId][$dateStr]['women'] = [
+                'files' => $womenFiles,
+                'enabled' => isset($session['women_enabled']) ? (bool)$session['women_enabled'] : true
+            ];
         }
     }
 }
@@ -373,11 +448,9 @@ $conn->close();
                                             echo 'background: #fff3cd; opacity: 0.7;';
                                         } else {
                                             // تحديد إذا كان اليوم يحتوي على ملفات
-                                            $hasMenData = $cellData && $cellData['men'];
-                                            $hasMenFile = $hasMenData && !empty($cellData['men']['image']);
-                                            $hasWomenData = $cellData && $cellData['women'];
-                                            $hasWomenFile = $hasWomenData && !empty($cellData['women']['image']);
-                                            $hasAnyFile = $hasMenFile || $hasWomenFile;
+                                            $menFiles = $cellData && isset($cellData['men']['files']) ? $cellData['men']['files'] : [];
+                                            $womenFiles = $cellData && isset($cellData['women']['files']) ? $cellData['women']['files'] : [];
+                                            $hasAnyFile = !empty($menFiles) || !empty($womenFiles);
                                             
                                             // إذا لم يكن هناك ملفات، جعل الخلفية أفتح قليلاً للتمييز
                                             if (!$hasAnyFile) {
@@ -387,36 +460,81 @@ $conn->close();
                                     ?>">
                                         <?php if (!$hasWeek): ?>
                                             <span style="color: #856404; font-size: 11px;">-</span>
-                                        <?php elseif ($hasAnyFile): ?>
-                                        <div style="display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap;">
-                                            <?php if ($hasMenFile): 
-                                                $menFileUrl = getImageUrl($cellData['men']['image']);
-                                                $isMenPdf = pathinfo($cellData['men']['image'], PATHINFO_EXTENSION) === 'pdf';
-                                            ?>
-                                                <button onclick="openPdf('<?php echo htmlspecialchars($menFileUrl); ?>', <?php echo $isMenPdf ? 'true' : 'false'; ?>);" 
-                                                        style="background: #4a9eff; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; min-width: 45px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.3s;"
-                                                        onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)';"
-                                                        onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.2)';"
-                                                        title="<?php echo htmlspecialchars(($cellData['men']['time'] ?? '') . ' - ' . ($cellData['men']['trainer'] ?? '')); ?>">
-                                                    ر
-                                                </button>
+                                        <?php else: 
+                                            // جلب الملفات من البيانات
+                                            $menFiles = $cellData && isset($cellData['men']['files']) ? $cellData['men']['files'] : [];
+                                            $womenFiles = $cellData && isset($cellData['women']['files']) ? $cellData['women']['files'] : [];
+                                            $hasAnyFile = !empty($menFiles) || !empty($womenFiles);
+                                        ?>
+                                            <?php if ($hasAnyFile): ?>
+                                            <div style="display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; padding: 12px; min-height: 60px;">
+                                                <?php 
+                                                // عرض جميع ملفات الرجال كأزرار منفصلة - تحسين الكود
+                                                if (!empty($menFiles) && is_array($menFiles)): 
+                                                    $menFileCount = count($menFiles);
+                                                    foreach ($menFiles as $fileIndex => $file):
+                                                        // التحقق من صحة بيانات الملف
+                                                        if (empty($file) || !is_array($file) || empty($file['path']) || empty($file['filename'])) {
+                                                            continue;
+                                                        }
+                                                        
+                                                        $menFileUrl = trim($file['path']);
+                                                        $fileExtension = strtolower(pathinfo($file['filename'], PATHINFO_EXTENSION));
+                                                        $isMenPdf = ($fileExtension === 'pdf');
+                                                        $fileName = htmlspecialchars(basename($file['filename']), ENT_QUOTES, 'UTF-8');
+                                                        
+                                                        // التأكد من أن URL صحيح
+                                                        if (empty($menFileUrl)) {
+                                                            continue;
+                                                        }
+                                                ?>
+                                                    <button onclick="openPdf('<?php echo htmlspecialchars($menFileUrl, ENT_QUOTES, 'UTF-8'); ?>', <?php echo $isMenPdf ? 'true' : 'false'; ?>);" 
+                                                            style="background: linear-gradient(135deg, #42A5F5 0%, #2196F3 50%, #1976D2 100%); color: white; border: 3px solid #0D47A1; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 900; font-size: 16px; min-width: 50px; box-shadow: 0 4px 8px rgba(25,118,210,0.4); transition: all 0.3s; position: relative; display: inline-flex; align-items: center; justify-content: center; margin: 4px;"
+                                                            onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 12px rgba(25,118,210,0.5)';"
+                                                            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 8px rgba(25,118,210,0.4)';"
+                                                            title="رجال - ملف <?php echo ($fileIndex + 1); ?>/<?php echo $menFileCount; ?>: <?php echo $fileName; ?>">
+                                                        <span style="font-size: 18px; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">ر</span>
+                                                    </button>
+                                                <?php 
+                                                    endforeach; 
+                                                endif; 
+                                                ?>
+                                                
+                                                <?php 
+                                                // عرض جميع ملفات النساء كأزرار منفصلة - تحسين الكود
+                                                if (!empty($womenFiles) && is_array($womenFiles)): 
+                                                    $womenFileCount = count($womenFiles);
+                                                    foreach ($womenFiles as $fileIndex => $file):
+                                                        // التحقق من صحة بيانات الملف
+                                                        if (empty($file) || !is_array($file) || empty($file['path']) || empty($file['filename'])) {
+                                                            continue;
+                                                        }
+                                                        
+                                                        $womenFileUrl = trim($file['path']);
+                                                        $fileExtension = strtolower(pathinfo($file['filename'], PATHINFO_EXTENSION));
+                                                        $isWomenPdf = ($fileExtension === 'pdf');
+                                                        $fileName = htmlspecialchars(basename($file['filename']), ENT_QUOTES, 'UTF-8');
+                                                        
+                                                        // التأكد من أن URL صحيح
+                                                        if (empty($womenFileUrl)) {
+                                                            continue;
+                                                        }
+                                                ?>
+                                                    <button onclick="openPdf('<?php echo htmlspecialchars($womenFileUrl, ENT_QUOTES, 'UTF-8'); ?>', <?php echo $isWomenPdf ? 'true' : 'false'; ?>);" 
+                                                            style="background: linear-gradient(135deg, #EC407A 0%, #E91E63 50%, #C2185B 100%); color: white; border: 3px solid #880E4F; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 900; font-size: 16px; min-width: 50px; box-shadow: 0 4px 8px rgba(194,24,91,0.4); transition: all 0.3s; position: relative; display: inline-flex; align-items: center; justify-content: center; margin: 4px;"
+                                                            onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 12px rgba(194,24,91,0.5)';"
+                                                            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 8px rgba(194,24,91,0.4)';"
+                                                            title="نساء - ملف <?php echo ($fileIndex + 1); ?>/<?php echo $womenFileCount; ?>: <?php echo $fileName; ?>">
+                                                        <span style="font-size: 18px; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">ن</span>
+                                                    </button>
+                                                <?php 
+                                                    endforeach; 
+                                                endif; 
+                                                ?>
+                                            </div>
+                                            <?php else: ?>
+                                            <span style="color: #ccc; font-size: 12px;">-</span>
                                             <?php endif; ?>
-                                            
-                                            <?php if ($hasWomenFile): 
-                                                $womenFileUrl = getImageUrl($cellData['women']['image']);
-                                                $isWomenPdf = pathinfo($cellData['women']['image'], PATHINFO_EXTENSION) === 'pdf';
-                                            ?>
-                                                <button onclick="openPdf('<?php echo htmlspecialchars($womenFileUrl); ?>', <?php echo $isWomenPdf ? 'true' : 'false'; ?>);" 
-                                                        style="background: #ff4444; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; min-width: 45px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.3s;"
-                                                        onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)';"
-                                                        onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.2)';"
-                                                        title="<?php echo htmlspecialchars(($cellData['women']['time'] ?? '') . ' - ' . ($cellData['women']['trainer'] ?? '')); ?>">
-                                                    ن
-                                                </button>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php else: ?>
-                                        <span style="color: #ccc; font-size: 12px;">-</span>
                                         <?php endif; ?>
                                     </td>
                                 <?php endfor; ?>

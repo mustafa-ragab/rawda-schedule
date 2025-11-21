@@ -81,39 +81,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // معالجة إضافة مكتب جديد
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_office') {
-    $officeName = trim($_POST['office_name']);
+    $officeName = sanitizeInput(trim($_POST['office_name'] ?? ''));
     
     if (empty($officeName)) {
         $message = 'يجب إدخال اسم المكتب';
         $messageType = 'error';
+    } elseif (strlen($officeName) > 255) {
+        $message = 'اسم المكتب طويل جداً (الحد الأقصى: 255 حرف)';
+        $messageType = 'error';
     } else {
         $conn = getDBConnection();
         
-        // التحقق من وجود مكتب بنفس الاسم
-        $checkQuery = "SELECT id FROM offices WHERE name = ?";
-        $stmt = $conn->prepare($checkQuery);
-        $stmt->bind_param("s", $officeName);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows > 0) {
-            $message = 'المكتب موجود بالفعل!';
+        if (!$conn) {
+            $message = 'خطأ في الاتصال بقاعدة البيانات';
             $messageType = 'error';
-            $stmt->close();
         } else {
-            // إضافة المكتب الجديد
-            $insertQuery = "INSERT INTO offices (name) VALUES (?)";
-            $stmt = $conn->prepare($insertQuery);
-            $stmt->bind_param("s", $officeName);
-            
-            if ($stmt->execute()) {
-                $message = 'تم إضافة المكتب بنجاح!';
-                $messageType = 'success';
+            // التحقق من وجود مكتب بنفس الاسم
+            $checkQuery = "SELECT id FROM offices WHERE name = ?";
+            $stmt = $conn->prepare($checkQuery);
+            if ($stmt) {
+                $stmt->bind_param("s", $officeName);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if ($result->num_rows > 0) {
+                    $message = 'المكتب موجود بالفعل!';
+                    $messageType = 'error';
+                    $stmt->close();
+                } else {
+                    $stmt->close();
+                    // إضافة المكتب الجديد
+                    $insertQuery = "INSERT INTO offices (name) VALUES (?)";
+                    $stmt = $conn->prepare($insertQuery);
+                    if ($stmt) {
+                        $stmt->bind_param("s", $officeName);
+                        
+                        if ($stmt->execute()) {
+                            $message = 'تم إضافة المكتب بنجاح!';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'حدث خطأ أثناء إضافة المكتب: ' . $conn->error;
+                            $messageType = 'error';
+                        }
+                        $stmt->close();
+                    } else {
+                        $message = 'حدث خطأ أثناء إعداد الاستعلام';
+                        $messageType = 'error';
+                    }
+                }
             } else {
-                $message = 'حدث خطأ أثناء إضافة المكتب';
+                $message = 'حدث خطأ أثناء التحقق من المكتب';
                 $messageType = 'error';
             }
-            $stmt->close();
         }
     }
 }

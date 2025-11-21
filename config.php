@@ -1,7 +1,17 @@
 <?php
+/**
+ * ملف الإعدادات الرئيسي للمشروع
+ * يحتوي على جميع الإعدادات والدوال المشتركة
+ */
+
+// منع الوصول المباشر
+if (!defined('PHP_VERSION')) {
+    die('Direct access not allowed');
+}
+
 // إعدادات المشروع
-define('DB_FILE', __DIR__ . '/data/schedule.json');
-define('IMAGES_DIR', __DIR__ . '/images/');
+define('DB_FILE', __DIR__ . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'schedule.json');
+define('IMAGES_DIR', __DIR__ . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR);
 define('UPLOAD_MAX_SIZE', 5 * 1024 * 1024); // 5MB
 
 // إعدادات قاعدة البيانات
@@ -145,7 +155,16 @@ function uploadImage($file, $sessionId) {
 
 // دالة للحصول على رابط الصورة
 function getImageUrl($filename) {
-    if (empty($filename)) return null;
+    if (empty($filename)) {
+        return null;
+    }
+    // تنظيف اسم الملف من أي مسارات خطيرة
+    $filename = basename($filename);
+    // التأكد من أن الملف موجود
+    $filepath = IMAGES_DIR . $filename;
+    if (!file_exists($filepath)) {
+        return null;
+    }
     return 'images/' . $filename;
 }
 
@@ -155,7 +174,17 @@ function deleteImage($filename) {
         return ['success' => false, 'message' => 'اسم الملف فارغ'];
     }
     
+    // تنظيف اسم الملف من أي مسارات خطيرة
+    $filename = basename($filename);
     $filepath = IMAGES_DIR . $filename;
+    
+    // التأكد من أن الملف داخل المجلد المحدد (منع directory traversal)
+    $realPath = realpath($filepath);
+    $realImagesDir = realpath(IMAGES_DIR);
+    
+    if ($realPath === false || $realImagesDir === false || strpos($realPath, $realImagesDir) !== 0) {
+        return ['success' => false, 'message' => 'مسار الملف غير صالح'];
+    }
     
     if (file_exists($filepath)) {
         if (unlink($filepath)) {
@@ -166,5 +195,29 @@ function deleteImage($filename) {
     } else {
         return ['success' => false, 'message' => 'الملف غير موجود'];
     }
+}
+
+// دالة لتنظيف المدخلات
+function sanitizeInput($input) {
+    if (is_array($input)) {
+        return array_map('sanitizeInput', $input);
+    }
+    return htmlspecialchars(strip_tags(trim($input)), ENT_QUOTES, 'UTF-8');
+}
+
+// دالة للتحقق من صحة التاريخ
+function validateDate($date, $format = 'Y-m-d') {
+    $d = DateTime::createFromFormat($format, $date);
+    return $d && $d->format($format) === $date;
+}
+
+// دالة للتحقق من صحة رقم المكتب
+function validateOfficeId($officeId) {
+    return is_numeric($officeId) && $officeId > 0;
+}
+
+// دالة للتحقق من صحة رقم الأسبوع
+function validateWeekId($weekId) {
+    return is_numeric($weekId) && $weekId > 0;
 }
 

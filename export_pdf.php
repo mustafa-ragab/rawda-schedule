@@ -3,6 +3,10 @@ require_once 'config.php';
 
 // جلب التاريخ المحدد
 $selectedDate = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+// التحقق من صحة التاريخ
+if (!validateDate($selectedDate)) {
+    $selectedDate = date('Y-m-d');
+}
 $selectedDateObj = new DateTime($selectedDate);
 
 // حساب بداية الأسبوع من التاريخ المحدد (الأحد)
@@ -115,34 +119,125 @@ foreach ($offices as $office) {
             ];
         }
         
-        // ملء الجدول بالجلسات
+        // ملء الجدول بالجلسات والملفات
         foreach ($sessions as $session) {
-            $dateStr = $session['date'];
-            if (isset($scheduleGrid[$officeId][$dateStr])) {
-                $scheduleGrid[$officeId][$dateStr]['men'] = [
-                    'time' => $session['men_time'] ?? '',
-                    'trainer' => $session['men_trainer'] ?? '',
-                    'image' => $session['men_image'] ?? '',
-                    'enabled' => (bool)($session['men_enabled'] ?? true)
-                ];
-                
-                $scheduleGrid[$officeId][$dateStr]['women'] = [
-                    'time' => $session['women_time'] ?? '',
-                    'trainer' => $session['women_trainer'] ?? '',
-                    'image' => $session['women_image'] ?? '',
-                    'enabled' => (bool)($session['women_enabled'] ?? true)
+            $dateStr = isset($session['date']) ? $session['date'] : null;
+            $sessionId = isset($session['id']) ? (int)$session['id'] : 0;
+            
+            if (empty($dateStr) || $sessionId <= 0 || !isset($scheduleGrid[$officeId][$dateStr])) {
+                continue;
+            }
+            
+            // جلب ملفات الرجال من جدول session_files
+            $menFiles = [];
+            $menFilesQuery = "SELECT file_name, file_path FROM session_files WHERE session_id = ? AND file_type = 'men' ORDER BY id ASC";
+            $fileStmt = $conn->prepare($menFilesQuery);
+            if ($fileStmt) {
+                $fileStmt->bind_param("i", $sessionId);
+                if ($fileStmt->execute()) {
+                    $menFilesResult = $fileStmt->get_result();
+                    if ($menFilesResult) {
+                        while ($fileRow = $menFilesResult->fetch_assoc()) {
+                            if (!empty($fileRow['file_name'])) {
+                                $fileName = trim($fileRow['file_name']);
+                                $filePath = !empty($fileRow['file_path']) ? trim($fileRow['file_path']) : getImageUrl($fileName);
+                                
+                                // إذا كان file_path فارغاً أو null، استخدم getImageUrl
+                                if (empty($filePath)) {
+                                    $filePath = getImageUrl($fileName);
+                                }
+                                
+                                if (!empty($filePath)) {
+                                    $menFiles[] = [
+                                        'filename' => $fileName,
+                                        'path' => $filePath
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    error_log("Error executing men files query: " . $fileStmt->error);
+                }
+                $fileStmt->close();
+            } else {
+                error_log("Error preparing men files query: " . $conn->error);
+            }
+            
+            // جلب ملفات النساء من جدول session_files
+            $womenFiles = [];
+            $womenFilesQuery = "SELECT file_name, file_path FROM session_files WHERE session_id = ? AND file_type = 'women' ORDER BY id ASC";
+            $fileStmt = $conn->prepare($womenFilesQuery);
+            if ($fileStmt) {
+                $fileStmt->bind_param("i", $sessionId);
+                if ($fileStmt->execute()) {
+                    $womenFilesResult = $fileStmt->get_result();
+                    if ($womenFilesResult) {
+                        while ($fileRow = $womenFilesResult->fetch_assoc()) {
+                            if (!empty($fileRow['file_name'])) {
+                                $fileName = trim($fileRow['file_name']);
+                                $filePath = !empty($fileRow['file_path']) ? trim($fileRow['file_path']) : getImageUrl($fileName);
+                                
+                                // إذا كان file_path فارغاً أو null، استخدم getImageUrl
+                                if (empty($filePath)) {
+                                    $filePath = getImageUrl($fileName);
+                                }
+                                
+                                if (!empty($filePath)) {
+                                    $womenFiles[] = [
+                                        'filename' => $fileName,
+                                        'path' => $filePath
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    error_log("Error executing women files query: " . $fileStmt->error);
+                }
+                $fileStmt->close();
+            } else {
+                error_log("Error preparing women files query: " . $conn->error);
+            }
+            
+            // إذا لم توجد ملفات في الجدول الجديد، نستخدم الملف القديم (للتوافق مع البيانات القديمة)
+            if (empty($menFiles) && !empty($session['men_image'])) {
+                $menFiles[] = [
+                    'filename' => $session['men_image'],
+                    'path' => getImageUrl($session['men_image'])
                 ];
             }
+            
+            if (empty($womenFiles) && !empty($session['women_image'])) {
+                $womenFiles[] = [
+                    'filename' => $session['women_image'],
+                    'path' => getImageUrl($session['women_image'])
+                ];
+            }
+            
+            $scheduleGrid[$officeId][$dateStr]['men'] = [
+                'files' => $menFiles,
+                'enabled' => (bool)($session['men_enabled'] ?? true)
+            ];
+            
+            $scheduleGrid[$officeId][$dateStr]['women'] = [
+                'files' => $womenFiles,
+                'enabled' => (bool)($session['women_enabled'] ?? true)
+            ];
         }
     }
 }
 
 $conn->close();
 
-// حساب المسار الكامل للروابط
+// حساب المسار الكامل للروابط - استخدام مسار نسبي أو مطلق
+// للحصول على أفضل توافق، نستخدم مسار نسبي من المجلد الحالي
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'];
-$baseUrl = $protocol . '://' . $host . dirname($_SERVER['PHP_SELF']);
+$scriptPath = dirname($_SERVER['PHP_SELF']);
+// إزالة الشرطة المائلة الأخيرة إذا كانت موجودة
+$scriptPath = rtrim($scriptPath, '/');
+$baseUrl = $protocol . '://' . $host . $scriptPath;
 
 // إنشاء HTML للـ PDF
 $html = '<!DOCTYPE html>
@@ -158,39 +253,52 @@ $html = '<!DOCTYPE html>
         .header {
             text-align: center;
             margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
         .header h1 {
             color: #1a4d7a;
             margin: 0;
-            font-size: 24px;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         .header h2 {
-            color: #666;
-            margin: 5px 0;
-            font-size: 16px;
+            color: #1565c0;
+            margin: 8px 0 0 0;
+            font-size: 18px;
+            font-weight: 600;
         }
         table {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 20px;
             background: white;
             font-size: 11px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
         }
         th {
-            background: #e3f2fd !important;
-            padding: 10px 5px;
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+            padding: 12px 8px;
             border: 1px solid #1a4d7a;
             text-align: center;
             font-weight: bold;
             color: #1a4d7a !important;
-            font-size: 12px;
+            font-size: 13px;
+            border-bottom: 2px solid #1a4d7a;
         }
         td {
-            padding: 10px 5px;
+            padding: 12px 8px;
             border: 1px solid #ddd;
             text-align: center;
             vertical-align: middle;
             background: white;
+            min-height: 60px;
         }
         .office-cell {
             background: #f9f9f9 !important;
@@ -205,40 +313,38 @@ $html = '<!DOCTYPE html>
             font-size: 13px;
         }
         .button {
-            display: inline-block;
-            padding: 8px 12px;
-            border-radius: 6px;
+            display: inline-block !important;
+            padding: 10px 18px !important;
+            border-radius: 6px !important;
             color: #FFFFFF !important;
-            font-weight: 900 !important;
+            font-weight: bold !important;
             text-decoration: none !important;
-            margin: 2px;
+            margin: 4px 10px !important;
             font-size: 16px !important;
             cursor: pointer;
-            min-width: 40px;
-            text-align: center;
-            line-height: 1.2;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            min-width: 45px !important;
+            text-align: center !important;
+            line-height: 1.2 !important;
+            border: 2px solid !important;
         }
         .button:hover {
-            opacity: 0.9;
+            opacity: 0.92;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.35), 0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.25);
         }
         .button-men {
             background: #1976D2 !important;
-            border: 2px solid #0D47A1 !important;
+            border-color: #0D47A1 !important;
             color: #FFFFFF !important;
-            font-weight: 900 !important;
+            font-weight: bold !important;
             font-size: 16px !important;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-            letter-spacing: 1px;
         }
         .button-women {
-            background: #C2185B !important;
-            border: 2px solid #880E4F !important;
+            background: #E91E63 !important;
+            border-color: #880E4F !important;
             color: #FFFFFF !important;
-            font-weight: 900 !important;
+            font-weight: bold !important;
             font-size: 16px !important;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-            letter-spacing: 1px;
         }
         .cell-no-week {
             background: #fff3cd !important;
@@ -263,27 +369,36 @@ $html = '<!DOCTYPE html>
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
+            .button-container {
+                text-align: center !important;
+                padding: 10px 5px !important;
+                min-height: 40px !important;
+            }
+            .button {
+                margin: 4px 10px !important;
+                padding: 10px 18px !important;
+                border-radius: 6px !important;
+                display: inline-block !important;
+            }
             .button-men {
                 background: #1976D2 !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
                 color: #FFFFFF !important;
                 font-size: 16px !important;
-                font-weight: 900 !important;
-                text-shadow: 1px 1px 3px rgba(0,0,0,0.8) !important;
+                font-weight: bold !important;
                 border: 2px solid #0D47A1 !important;
-                padding: 8px 12px !important;
+                padding: 10px 18px !important;
             }
             .button-women {
-                background: #C2185B !important;
+                background: #E91E63 !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
                 color: #FFFFFF !important;
                 font-size: 16px !important;
-                font-weight: 900 !important;
-                text-shadow: 1px 1px 3px rgba(0,0,0,0.8) !important;
+                font-weight: bold !important;
                 border: 2px solid #880E4F !important;
-                padding: 8px 12px !important;
+                padding: 10px 18px !important;
             }
             a.button {
                 text-decoration: none !important;
@@ -350,29 +465,112 @@ foreach ($offices as $office) {
         if ($hasWeek) {
             $cellData = isset($scheduleGrid[$officeId][$dateStr]) ? $scheduleGrid[$officeId][$dateStr] : null;
             
-            $hasMenData = $cellData && $cellData['men'];
-            $hasMenFile = $hasMenData && !empty($cellData['men']['image']);
-            $hasWomenData = $cellData && $cellData['women'];
-            $hasWomenFile = $hasWomenData && !empty($cellData['women']['image']);
-            $hasAnyFile = $hasMenFile || $hasWomenFile;
+            $menFiles = [];
+            $womenFiles = [];
             
-            if ($hasMenFile) {
-                $menFileUrl = getImageUrl($cellData['men']['image']);
-                $fullMenUrl = $baseUrl . '/' . ltrim($menFileUrl, '/');
-                $html .= '<a href="' . htmlspecialchars($fullMenUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" class="button button-men">ر</a>';
+            if ($cellData) {
+                if (isset($cellData['men']['files']) && is_array($cellData['men']['files'])) {
+                    $menFiles = $cellData['men']['files'];
+                }
+                if (isset($cellData['women']['files']) && is_array($cellData['women']['files'])) {
+                    $womenFiles = $cellData['women']['files'];
+                }
             }
             
-            if ($hasWomenFile) {
-                $womenFileUrl = getImageUrl($cellData['women']['image']);
-                $fullWomenUrl = $baseUrl . '/' . ltrim($womenFileUrl, '/');
-                $html .= '<a href="' . htmlspecialchars($fullWomenUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" class="button button-women">ن</a>';
-            }
+            $hasAnyFile = !empty($menFiles) || !empty($womenFiles);
             
-            if (!$hasAnyFile) {
-                $html .= '<span style="color: #ccc; font-size: 12px;">-</span>';
+            // عرض الأزرار مباشرة بدون حاوية معقدة
+            if ($hasAnyFile) {
+                // عرض ملفات الرجال - عرض جميع الملفات
+                if (!empty($menFiles)) {
+                    $menFileCount = count($menFiles);
+                    foreach ($menFiles as $fileIndex => $file) {
+                        $menFileUrl = isset($file['path']) ? trim($file['path']) : '';
+                        $fileName = isset($file['filename']) ? trim($file['filename']) : '';
+                        
+                        // إذا كان file_path فارغاً، استخدم filename لبناء URL
+                        if (empty($menFileUrl) && !empty($fileName)) {
+                            $menFileUrl = getImageUrl($fileName);
+                        }
+                        
+                        // بناء URL كامل مع التحقق من الأمان
+                        if (strpos($menFileUrl, 'http://') === 0 || strpos($menFileUrl, 'https://') === 0) {
+                            // URL مطلق موجود بالفعل - التحقق من أنه آمن
+                            $fullMenUrl = filter_var($menFileUrl, FILTER_VALIDATE_URL);
+                            if ($fullMenUrl === false) {
+                                continue; // تخطي الملف إذا كان URL غير صالح
+                            }
+                        } else {
+                            // URL نسبي - تنظيف المسار (إزالة أي محاولات directory traversal)
+                            $menFileUrl = str_replace('..', '', $menFileUrl); // منع directory traversal
+                            $menFileUrl = ltrim($menFileUrl, '/');
+                            // URL نسبي - بناء URL كامل
+                            $fullMenUrl = $baseUrl . '/' . $menFileUrl;
+                            // إزالة أي مسارات مكررة
+                            $fullMenUrl = preg_replace('#([^:])//+#', '$1/', $fullMenUrl);
+                        }
+                        
+                        // تنظيف URL النهائي
+                        $fullMenUrl = str_replace('http:/', 'http://', $fullMenUrl);
+                        $fullMenUrl = str_replace('https:/', 'https://', $fullMenUrl);
+                        
+                        // التحقق النهائي من URL
+                        if (empty($fullMenUrl)) {
+                            continue; // تخطي الملف إذا كان URL فارغ
+                        }
+                        
+                        $displayFileName = htmlspecialchars(basename($fileName ?: $menFileUrl));
+                        $html .= '<a href="' . htmlspecialchars($fullMenUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" class="button button-men">ر</a>';
+                    }
+                }
+                
+                // عرض ملفات النساء - عرض جميع الملفات
+                if (!empty($womenFiles)) {
+                    $womenFileCount = count($womenFiles);
+                    foreach ($womenFiles as $fileIndex => $file) {
+                        $womenFileUrl = isset($file['path']) ? trim($file['path']) : '';
+                        $fileName = isset($file['filename']) ? trim($file['filename']) : '';
+                        
+                        // إذا كان file_path فارغاً، استخدم filename لبناء URL
+                        if (empty($womenFileUrl) && !empty($fileName)) {
+                            $womenFileUrl = getImageUrl($fileName);
+                        }
+                        
+                        // بناء URL كامل مع التحقق من الأمان
+                        if (strpos($womenFileUrl, 'http://') === 0 || strpos($womenFileUrl, 'https://') === 0) {
+                            // URL مطلق موجود بالفعل - التحقق من أنه آمن
+                            $fullWomenUrl = filter_var($womenFileUrl, FILTER_VALIDATE_URL);
+                            if ($fullWomenUrl === false) {
+                                continue; // تخطي الملف إذا كان URL غير صالح
+                            }
+                        } else {
+                            // URL نسبي - تنظيف المسار (إزالة أي محاولات directory traversal)
+                            $womenFileUrl = str_replace('..', '', $womenFileUrl); // منع directory traversal
+                            $womenFileUrl = ltrim($womenFileUrl, '/');
+                            // URL نسبي - بناء URL كامل
+                            $fullWomenUrl = $baseUrl . '/' . $womenFileUrl;
+                            // إزالة أي مسارات مكررة
+                            $fullWomenUrl = preg_replace('#([^:])//+#', '$1/', $fullWomenUrl);
+                        }
+                        
+                        // تنظيف URL النهائي
+                        $fullWomenUrl = str_replace('http:/', 'http://', $fullWomenUrl);
+                        $fullWomenUrl = str_replace('https:/', 'https://', $fullWomenUrl);
+                        
+                        // التحقق النهائي من URL
+                        if (empty($fullWomenUrl)) {
+                            continue; // تخطي الملف إذا كان URL فارغ
+                        }
+                        
+                        $displayFileName = htmlspecialchars(basename($fileName ?: $womenFileUrl));
+                        $html .= '<a href="' . htmlspecialchars($fullWomenUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" class="button button-women">ن</a>';
+                    }
+                }
+            } else {
+                $html .= '<span style="color: #ccc; font-size: 13px;">-</span>';
             }
         } else {
-            $html .= '<span style="color: #856404; font-size: 11px;">-</span>';
+            $html .= '<span style="color: #856404; font-size: 12px; display: block; padding: 10px;">-</span>';
         }
         
         $html .= '</td>';
@@ -408,6 +606,8 @@ if ($useMPDF) {
             'allow_charset_conversion' => true,
             'autoScriptToLang' => true,
             'autoLangToFont' => true,
+            'useSubstitutions' => false,
+            'showImageErrors' => true,
         ]);
         
         $mpdf->SetTitle('جدول الروضة - ' . date('d/m/Y', strtotime($headerStartDate->format('Y-m-d'))));
@@ -417,6 +617,11 @@ if ($useMPDF) {
         $mpdf->autoScriptToLang = true;
         $mpdf->autoLangToFont = true;
         
+        // إعدادات إضافية لضمان ظهور الألوان
+        $mpdf->useSubstitutions = false;
+        
+        // إعدادات إضافية للروابط - استخدام WriteHTML العادي
+        // mPDF يدعم الروابط تلقائياً في HTML
         $mpdf->WriteHTML($html);
         
         $mpdf->Output('schedule_' . date('Y-m-d', strtotime($headerStartDate->format('Y-m-d'))) . '.pdf', 'D');
