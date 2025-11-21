@@ -2,12 +2,13 @@
 /**
  * ملف الإعدادات الرئيسي للمشروع
  * يحتوي على جميع الإعدادات والدوال المشتركة
+ * 
+ * @version 1.0
+ * @author Rawda Schedule System
  */
 
 // منع الوصول المباشر
-if (!defined('PHP_VERSION')) {
-    die('Direct access not allowed');
-}
+defined('PHP_VERSION') or die('Direct access not allowed');
 
 // إعدادات المشروع
 define('DB_FILE', __DIR__ . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'schedule.json');
@@ -197,27 +198,66 @@ function deleteImage($filename) {
     }
 }
 
-// دالة لتنظيف المدخلات
+/**
+ * تنظيف المدخلات من HTML و XSS
+ * 
+ * @param mixed $input المدخل المراد تنظيفه
+ * @return mixed المدخل المنظف
+ */
 function sanitizeInput($input) {
     if (is_array($input)) {
         return array_map('sanitizeInput', $input);
     }
+    if (!is_string($input)) {
+        return $input;
+    }
     return htmlspecialchars(strip_tags(trim($input)), ENT_QUOTES, 'UTF-8');
 }
 
-// دالة للتحقق من صحة التاريخ
+/**
+ * التحقق من صحة التاريخ
+ * 
+ * @param string $date التاريخ المراد التحقق منه
+ * @param string $format تنسيق التاريخ (افتراضي: Y-m-d)
+ * @return bool true إذا كان التاريخ صحيحاً
+ */
 function validateDate($date, $format = 'Y-m-d') {
+    if (empty($date) || !is_string($date)) {
+        return false;
+    }
     $d = DateTime::createFromFormat($format, $date);
     return $d && $d->format($format) === $date;
 }
 
-// دالة للتحقق من صحة رقم المكتب
+/**
+ * التحقق من صحة رقم المكتب
+ * 
+ * @param mixed $officeId رقم المكتب
+ * @return bool true إذا كان الرقم صحيحاً
+ */
 function validateOfficeId($officeId) {
-    return is_numeric($officeId) && $officeId > 0;
+    return is_numeric($officeId) && (int)$officeId > 0;
 }
 
-// دالة للتحقق من صحة رقم الأسبوع
+/**
+ * التحقق من صحة رقم الأسبوع
+ * 
+ * @param mixed $weekId رقم الأسبوع
+ * @return bool true إذا كان الرقم صحيحاً
+ */
 function validateWeekId($weekId) {
-    return is_numeric($weekId) && $weekId > 0;
+    return is_numeric($weekId) && (int)$weekId > 0;
+}
+
+/**
+ * بناء رابط آمن مع معاملات GET
+ * 
+ * @param string $page اسم الصفحة
+ * @param array $params معاملات GET
+ * @return string الرابط الكامل
+ */
+function buildUrl($page, $params = []) {
+    $query = http_build_query($params);
+    return htmlspecialchars($page . ($query ? '?' . $query : ''), ENT_QUOTES, 'UTF-8');
 }
 

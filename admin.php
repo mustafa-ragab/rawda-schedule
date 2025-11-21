@@ -1109,7 +1109,7 @@ if ($currentWeekId > 0 && $currentWeekData) {
                         </p>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
                             <?php if ($currentWeekId > 0 && $currentWeekData): ?>
-                                <a href="edit_week.php?week_id=<?php echo isset($currentWeekId) && validateWeekId($currentWeekId) ? (int)$currentWeekId : 0; ?>" 
+                                <a href="<?php echo isset($currentWeekId) && validateWeekId($currentWeekId) ? buildUrl('edit_week.php', ['week_id' => (int)$currentWeekId]) : '#'; ?>" 
                                    style="display: inline-block; padding: 10px 20px; background: linear-gradient(135deg, #2196F3 0%, #1976d2 100%); color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(33,150,243,0.3); transition: all 0.3s; border: 2px solid #0d47a1;"
                                    onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(33,150,243,0.4)';"
                                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(33,150,243,0.3)';">
@@ -1242,7 +1242,7 @@ if ($currentWeekId > 0 && $currentWeekData) {
                                 </span>
                             <?php endif; ?>
                             <?php if ($currentWeekId > 0 && $hasFiles): ?>
-                                <a href="edit_week.php?week_id=<?php echo isset($currentWeekId) && validateWeekId($currentWeekId) ? (int)$currentWeekId : 0; ?>" 
+                                <a href="<?php echo isset($currentWeekId) && validateWeekId($currentWeekId) ? buildUrl('edit_week.php', ['week_id' => (int)$currentWeekId]) : '#'; ?>" 
                                    style="display: inline-block; padding: 5px 12px; background: #2196F3; color: white; text-decoration: none; border-radius: 5px; font-size: 12px; margin-right: 10px; font-weight: bold;">
                                     ✏️ تعديل/حذف ملفات هذا اليوم
                                 </a>
@@ -1542,7 +1542,7 @@ if ($currentWeekId > 0 && $currentWeekData) {
                                 <?php endfor; ?>
                                 <td style="padding: 15px; text-align: center; border: 1px solid #dee2e6;">
                                     <?php if ($weekId > 0): ?>
-                                        <a href="edit_week.php?week_id=<?php echo isset($weekId) && validateWeekId($weekId) ? (int)$weekId : 0; ?>" 
+                                        <a href="<?php echo isset($weekId) && validateWeekId($weekId) ? buildUrl('edit_week.php', ['week_id' => (int)$weekId]) : '#'; ?>" 
                                            style="display: inline-block; padding: 10px 18px; background: linear-gradient(135deg, #2196F3 0%, #1976d2 100%); color: white; text-decoration: none; border-radius: 6px; font-size: 14px; transition: all 0.3s; font-weight: bold; box-shadow: 0 2px 4px rgba(33,150,243,0.3);"
                                            onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(33,150,243,0.4)';"
                                            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(33,150,243,0.3)';">

@@ -357,7 +357,7 @@ $conn->close();
             <a href="admin.php" style="padding: 10px 20px; background: #4caf50; color: white; text-decoration: none; border-radius: 5px; font-size: 16px; margin-left: 10px;">➕ إضافة بيانات</a>
             <a href="add_office.php" style="padding: 10px 20px; background: #2196F3; color: white; text-decoration: none; border-radius: 5px; font-size: 16px;">🏢 إدارة المكاتب</a>
             <?php if (!empty($offices) && $currentWeek): ?>
-            <a href="export_pdf.php?date=<?php echo urlencode($selectedDate); ?>" 
+            <a href="<?php echo buildUrl('export_pdf.php', ['date' => $selectedDate]); ?>" 
                style="padding: 10px 20px; background: #f44336; color: white; text-decoration: none; border-radius: 5px; font-size: 16px; margin-right: 10px;">📄 تحميل PDF</a>
             <?php endif; ?>
         </div>
