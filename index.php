@@ -488,13 +488,15 @@ $conn->close();
                                                             continue;
                                                         }
                                                 ?>
-                                                    <button onclick="openPdf('<?php echo htmlspecialchars($menFileUrl, ENT_QUOTES, 'UTF-8'); ?>', <?php echo $isMenPdf ? 'true' : 'false'; ?>);" 
-                                                            style="background: linear-gradient(135deg, #42A5F5 0%, #2196F3 50%, #1976D2 100%); color: white; border: 3px solid #0D47A1; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 900; font-size: 16px; min-width: 50px; box-shadow: 0 4px 8px rgba(25,118,210,0.4); transition: all 0.3s; position: relative; display: inline-flex; align-items: center; justify-content: center; margin: 4px;"
-                                                            onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 12px rgba(25,118,210,0.5)';"
-                                                            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 8px rgba(25,118,210,0.4)';"
-                                                            title="رجال - ملف <?php echo ($fileIndex + 1); ?>/<?php echo $menFileCount; ?>: <?php echo $fileName; ?>">
+                                                    <a href="<?php echo htmlspecialchars($menFileUrl, ENT_QUOTES, 'UTF-8'); ?>" 
+                                                       target="_blank" 
+                                                       <?php if ($isMenPdf): ?>download<?php endif; ?>
+                                                       style="background: linear-gradient(135deg, #42A5F5 0%, #2196F3 50%, #1976D2 100%); color: white; border: 3px solid #0D47A1; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 900; font-size: 16px; min-width: 50px; box-shadow: 0 4px 8px rgba(25,118,210,0.4); transition: all 0.3s; position: relative; display: inline-flex; align-items: center; justify-content: center; margin: 4px; text-decoration: none;"
+                                                       onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 12px rgba(25,118,210,0.5)';"
+                                                       onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 8px rgba(25,118,210,0.4)';"
+                                                       title="رجال - ملف <?php echo ($fileIndex + 1); ?>/<?php echo $menFileCount; ?>: <?php echo $fileName; ?>">
                                                         <span style="font-size: 18px; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">ر</span>
-                                                    </button>
+                                                    </a>
                                                 <?php 
                                                     endforeach; 
                                                 endif; 
@@ -520,13 +522,15 @@ $conn->close();
                                                             continue;
                                                         }
                                                 ?>
-                                                    <button onclick="openPdf('<?php echo htmlspecialchars($womenFileUrl, ENT_QUOTES, 'UTF-8'); ?>', <?php echo $isWomenPdf ? 'true' : 'false'; ?>);" 
-                                                            style="background: linear-gradient(135deg, #EC407A 0%, #E91E63 50%, #C2185B 100%); color: white; border: 3px solid #880E4F; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 900; font-size: 16px; min-width: 50px; box-shadow: 0 4px 8px rgba(194,24,91,0.4); transition: all 0.3s; position: relative; display: inline-flex; align-items: center; justify-content: center; margin: 4px;"
-                                                            onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 12px rgba(194,24,91,0.5)';"
-                                                            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 8px rgba(194,24,91,0.4)';"
-                                                            title="نساء - ملف <?php echo ($fileIndex + 1); ?>/<?php echo $womenFileCount; ?>: <?php echo $fileName; ?>">
+                                                    <a href="<?php echo htmlspecialchars($womenFileUrl, ENT_QUOTES, 'UTF-8'); ?>" 
+                                                       target="_blank" 
+                                                       <?php if ($isWomenPdf): ?>download<?php endif; ?>
+                                                       style="background: linear-gradient(135deg, #EC407A 0%, #E91E63 50%, #C2185B 100%); color: white; border: 3px solid #880E4F; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 900; font-size: 16px; min-width: 50px; box-shadow: 0 4px 8px rgba(194,24,91,0.4); transition: all 0.3s; position: relative; display: inline-flex; align-items: center; justify-content: center; margin: 4px; text-decoration: none;"
+                                                       onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 12px rgba(194,24,91,0.5)';"
+                                                       onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 8px rgba(194,24,91,0.4)';"
+                                                       title="نساء - ملف <?php echo ($fileIndex + 1); ?>/<?php echo $womenFileCount; ?>: <?php echo $fileName; ?>">
                                                         <span style="font-size: 18px; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">ن</span>
-                                                    </button>
+                                                    </a>
                                                 <?php 
                                                     endforeach; 
                                                 endif; 

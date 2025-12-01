@@ -248,7 +248,8 @@ $html = '<!DOCTYPE html>
         body {
             font-family: Arial, sans-serif;
             direction: rtl;
-            padding: 20px;
+            padding: 25px;
+            font-size: 14px;
         }
         .header {
             text-align: center;
@@ -275,54 +276,54 @@ $html = '<!DOCTYPE html>
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            margin-top: 20px;
+            margin-top: 25px;
             background: white;
-            font-size: 11px;
+            font-size: 13px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
         }
         th {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
-            padding: 12px 8px;
+            padding: 14px 10px;
             border: 1px solid #1a4d7a;
             text-align: center;
             font-weight: bold;
             color: #1a4d7a !important;
-            font-size: 13px;
+            font-size: 14px;
             border-bottom: 2px solid #1a4d7a;
         }
         td {
-            padding: 12px 8px;
+            padding: 14px 10px;
             border: 1px solid #ddd;
             text-align: center;
             vertical-align: middle;
             background: white;
-            min-height: 60px;
+            min-height: 70px;
         }
         .office-cell {
             background: #f9f9f9 !important;
             font-weight: bold;
             color: #000 !important;
-            font-size: 13px;
+            font-size: 14px;
         }
         .office-cell-no-week {
             background: #fff3cd !important;
             font-weight: bold;
             color: #856404 !important;
-            font-size: 13px;
+            font-size: 14px;
         }
         .button {
             display: inline-block !important;
-            padding: 10px 18px !important;
-            border-radius: 6px !important;
+            padding: 12px 20px !important;
+            border-radius: 8px !important;
             color: #FFFFFF !important;
             font-weight: bold !important;
             text-decoration: none !important;
-            margin: 4px 10px !important;
-            font-size: 16px !important;
+            margin: 6px 12px !important;
+            font-size: 18px !important;
             cursor: pointer;
-            min-width: 45px !important;
+            min-width: 52px !important;
             text-align: center !important;
             line-height: 1.2 !important;
             border: 2px solid !important;
@@ -337,14 +338,14 @@ $html = '<!DOCTYPE html>
             border-color: #0D47A1 !important;
             color: #FFFFFF !important;
             font-weight: bold !important;
-            font-size: 16px !important;
+            font-size: 18px !important;
         }
         .button-women {
             background: #E91E63 !important;
             border-color: #880E4F !important;
             color: #FFFFFF !important;
             font-weight: bold !important;
-            font-size: 16px !important;
+            font-size: 18px !important;
         }
         .cell-no-week {
             background: #fff3cd !important;
@@ -520,7 +521,8 @@ foreach ($offices as $office) {
                         }
                         
                         $displayFileName = htmlspecialchars(basename($fileName ?: $menFileUrl));
-                        $html .= '<a href="' . htmlspecialchars($fullMenUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" class="button button-men">ر</a>';
+                        // إضافة مسافة واضحة بعد كل زر رجال داخل خلية اليوم في ملف الـ PDF
+                        $html .= '<a href="' . htmlspecialchars($fullMenUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" class="button button-men">ر</a>&nbsp;&nbsp;';
                     }
                 }
                 
@@ -563,7 +565,8 @@ foreach ($offices as $office) {
                         }
                         
                         $displayFileName = htmlspecialchars(basename($fileName ?: $womenFileUrl));
-                        $html .= '<a href="' . htmlspecialchars($fullWomenUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" class="button button-women">ن</a>';
+                        // إضافة مسافة واضحة بعد كل زر نساء داخل خلية اليوم في ملف الـ PDF
+                        $html .= '<a href="' . htmlspecialchars($fullWomenUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" class="button button-women">ن</a>&nbsp;&nbsp;';
                     }
                 }
             } else {
